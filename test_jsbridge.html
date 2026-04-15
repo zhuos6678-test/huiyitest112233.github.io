@@ -78,9 +78,20 @@ var PLUGINS = {
   ]
 };
 
-// 从 URL hash 读取 plugin，默认 CommonPlugin
-var plugin = (location.hash || "#CommonPlugin").substring(1);
-if (!PLUGINS[plugin]) plugin = "CommonPlugin";
+// 读取 plugin: 优先 query string ?plugin=X，其次 path 最后一段 /X，默认 CommonPlugin
+var plugin = "CommonPlugin";
+var qs = (location.search || "").substring(1);
+qs.split("&").forEach(function(p) {
+  var kv = p.split("=");
+  if (kv[0] === "plugin" && kv[1]) plugin = decodeURIComponent(kv[1]);
+});
+if (!PLUGINS[plugin]) {
+  // fallback: 从 path 读取，如 /test_jsbridge/DevicePlugin
+  var segs = location.pathname.split("/");
+  var last = segs[segs.length - 1];
+  if (PLUGINS[last]) plugin = last;
+  else plugin = "CommonPlugin";
+}
 var METHODS = PLUGINS[plugin];
 var TIMEOUT_MS = 3000;
 var results = {};
