@@ -75,22 +75,51 @@ var PLUGINS = {
     "GetBluetoothDevices","GetConnectedBluetoothDevices",
     "CreateBLEConnection","CloseBLEConnection",
     "GetBLEDeviceServices","GetBLEDeviceCharacteristics","ReadBLECharacteristicValue"
+  ],
+  OpenAppContextPlugin: [
+    "SendChatMessage","GetEnterInfo","GetChatInfo",
+    "OpenChat","GetUserInfo","GetDocInfo"
+  ],
+  OpenMeetingPlugin: [
+    "JoinMeeting","GetMeetingInfo","LeaveMeeting","GetParticipantList"
+  ],
+  EventManagerPlugin: [
+    "RegisterEvent","UnRegisterEvent","ResetEventName"
+  ],
+  MonitorPlugin: [
+    "PerfStart","PerfEnd","AnalysisReport",
+    "ReportBizEvent","ReportApiEvent","ReportPerf"
+  ],
+  MediaPlugin: [
+    "StartRecord","StopRecord","GetRecordState",
+    "CreateInnerAudioContext","DestroyInnerAudioContext",
+    "InnerAudioContextCallFunction","ChooseMedia","CompressImage"
+  ],
+  NavigatePlugin: [
+    "NavigateTo","NavigateBack","RedirectTo","ReLaunch"
+  ],
+  AppPlugin: [
+    "GetLaunchOptions","GetEnterOptions","ExitMiniProgram"
+  ],
+  MessageChannelPlugin: [
+    "SubscribeEvent","UnsubscribeEvent","PostMessage",
+    "SendMessage","GetOnlineGroupMemberCount","GetLikeInfo",
+    "SendLike","SendMessageToExtension","RecordInteraction"
+  ],
+  EmbeddedWebElementPlugin: [
+    "CreateLiveVideoContext","CreateVideoContext","CreateAudioContext",
+    "DestroyLiveVideoContext","DestroyVideoContext","DestroyAudioContext",
+    "EmbeddedElementCallFunction"
   ]
 };
 
-// 读取 plugin: 优先 query string ?plugin=X，其次 path 最后一段 /X，默认 CommonPlugin
-var plugin = "BluetoothPlugin";
-var qs = (location.search || "").substring(1);
-qs.split("&").forEach(function(p) {
-  var kv = p.split("=");
-  if (kv[0] === "plugin" && kv[1]) plugin = decodeURIComponent(kv[1]);
-});
-plugin = "BluetoothPlugin"; if (false) {
-  // fallback: 从 path 读取，如 /test_jsbridge/DevicePlugin
-  var segs = location.pathname.split("/");
-  var last = segs[segs.length - 1];
-  if (PLUGINS[last]) plugin = last;
-  else plugin = "CommonPlugin";
+// 从 URL path 读取 plugin 名，如 /xxx/OpenAppPlugin 或 /xxx/OpenAppPlugin.html
+// Intent URI 中 ? 和 # 都会丢失，只有 path 可靠
+var plugin = "CommonPlugin";
+var segs = location.pathname.split("/");
+for (var si = segs.length - 1; si >= 0; si--) {
+  var seg = segs[si].replace(/\.html$/, "");
+  if (PLUGINS[seg]) { plugin = seg; break; }
 }
 var METHODS = PLUGINS[plugin];
 var TIMEOUT_MS = 3000;
