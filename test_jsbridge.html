@@ -184,6 +184,13 @@ function callMethod(method) {
     window[cbName] = function(jsonStr) {
       if (settled) return;
       settled = true;
+
+      // 在页面上打印完整响应
+      var dbg2 = document.createElement("div");
+      dbg2.style.cssText = "font-size:9px;color:#4a9;padding:1px 0;border-bottom:1px dotted #333;word-break:break-all;";
+      dbg2.textContent = "<<< " + method + ": " + jsonStr;
+      document.getElementById("log").appendChild(dbg2);
+
       try {
         var resp = JSON.parse(jsonStr);
         var code = resp.code !== undefined ? resp.code : (resp.errCode !== undefined ? resp.errCode : -999);
@@ -206,14 +213,23 @@ function callMethod(method) {
       }
     }, TIMEOUT_MS);
 
+    var req = {
+      callback: cbName,
+      module: plugin,
+      method: method,
+      param: {},
+      callId: callId
+    };
+    var reqStr = JSON.stringify(req);
+
+    // 在页面上打印完整请求
+    var dbg = document.createElement("div");
+    dbg.style.cssText = "font-size:9px;color:#666;padding:1px 0;border-bottom:1px dotted #333;word-break:break-all;";
+    dbg.textContent = ">>> " + reqStr;
+    document.getElementById("log").appendChild(dbg);
+
     try {
-      window.JSCallJavaMgr.JSCallNative(JSON.stringify({
-        callback: cbName,
-        module: plugin,
-        method: method,
-        param: {},
-        callId: callId
-      }));
+      window.JSCallJavaMgr.JSCallNative(reqStr);
     } catch(e) {
       settled = true;
       report(method, "fail", "ERR:" + e.message);
