@@ -17,7 +17,7 @@ function callJSBridge(module, method, params) {
         params: params || {}
     });
     try {
-        JSCallJavaMgr.JSCallNative(module, msg);
+        JSCallJavaMgr.JSCallNative(msg);
         return true;
     } catch(e) {
         addLog('ERR: ' + e);
