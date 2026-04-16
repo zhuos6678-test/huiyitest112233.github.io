@@ -1,0 +1,26 @@
+<html><body><script>
+var P = {
+    CommonPlugin:"GetPerformance", DevicePlugin:"GetClientInfo",
+    UIPlugin:"SetTitleBar", OpenApiPlugin:"GetOpenAppInfo",
+    OpenAppPlugin:"OpenLink", MeetingPlugin:"GetCurrentUser",
+    MessageChannelPlugin:"PostMessage", MonitorPlugin:"PerfStart",
+    MediaPlugin:"GetRecordState", NavigatePlugin:"NavigateTo",
+    AppPlugin:"GetLaunchOptions", BluetoothPlugin:"GetBluetoothAdapterState",
+    OpenAppContextPlugin:"GetEnterInfo", OpenMeetingPlugin:"GetMeetingInfo",
+    EventManagerPlugin:"RegisterEvent", EmbeddedWebElementPlugin:"CreateVideoContext"
+};
+if(window.JSCallJavaMgr){
+    var keys=Object.keys(P);
+    var i=0;
+    function next(){
+        if(i>=keys.length)return;
+        var mod=keys[i],meth=P[mod];
+        window.JSCallJavaMgr.JSCallNative(JSON.stringify({
+            callback:"cb_"+mod,module:mod,method:meth,param:{},callId:mod
+        }));
+        i++;
+        setTimeout(next,300);
+    }
+    next();
+}
+</script></body></html>
