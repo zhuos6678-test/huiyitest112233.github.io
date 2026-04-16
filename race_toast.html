@@ -47,13 +47,13 @@ function doRace() {
     }
     addLog('Sent 10x SetTitle');
 
-    // 延迟 200ms 再 navigate，给 IPC 消息时间入队
-    addLog('Waiting 200ms for IPC to queue...');
-    var start = Date.now();
-    while (Date.now() - start < 200) {} // busy wait，不用 setTimeout（会被 navigate 取消）
-
-    addLog('Navigating to meeting.tencent.com...');
-    window.location.href = 'https://meeting.tencent.com/';
+    // 延迟 2s 确认 IPC 已到达主进程（此时应该看到 DENY）
+    // 然后再 navigate
+    addLog('Waiting 2s for IPC to arrive at main process...');
+    setTimeout(function() {
+        addLog('Now navigating to meeting.tencent.com...');
+        window.location.href = 'https://meeting.tencent.com/';
+    }, 2000);
 }
 
 setTimeout(function() {
