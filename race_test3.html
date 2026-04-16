@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Race PoC v3 - pushState</title></head>
+<body>
+<h2>pushState URL Change Test</h2>
+<pre id="log" style="font-size:12px;max-height:80vh;overflow:auto;"></pre>
+<script>
+var log = document.getElementById('log');
+function addLog(s) {
+    log.textContent += '[' + Date.now() + '] ' + s + '\n';
+    log.scrollTop = log.scrollHeight;
+}
+
+function callJSBridge(module, method, params, callbackName) {
+    var callId = callbackName || (module + '_' + method + '_' + Date.now());
+    window[callId] = function(resp) {
+        addLog('★ CALLBACK: ' + module + '.' + method + ' → ' + JSON.stringify(resp).substring(0, 300));
+    };
+    var msg = JSON.stringify({
+        module: module,
+        method: method,
+        event_name: callId,
+        params: params || {}
+    });
+    try {
+        JSCallJavaMgr.JSCallNative(module, msg);
+        return true;
+    } catch(e) {
+        addLog('ERR: ' + e);
+        return false;
+    }
+}
+
+function startTest() {
+    addLog('=== pushState URL Change Test ===');
+    addLog('Original URL: ' + location.href);
+
+    // 测试 1: pushState 同源 URL 变化
+    addLog('');
+    addLog('--- Test 1: pushState same-origin ---');
+    try {
+        history.pushState({}, '', '/fake-meeting-path');
+        addLog('pushState → ' + location.href);
+    } catch(e) {
+        addLog('pushState failed: ' + e);
+    }
+
+    // 等一下让 doUpdateVisitedHistory 触发
+    setTimeout(function() {
+        addLog('Calling JSBridge after pushState...');
+        callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 0}, 'test_after_pushstate');
+
+        // 测试 2: replaceState
+        setTimeout(function() {
+            addLog('');
+            addLog('--- Test 2: replaceState ---');
+            try {
+                history.replaceState({}, '', '/another-fake-path?meeting=true');
+                addLog('replaceState → ' + location.href);
+            } catch(e) {
+                addLog('replaceState failed: ' + e);
+            }
+
+            setTimeout(function() {
+                callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 0}, 'test_after_replacestate');
+
+                // 测试 3: hash 变化
+                setTimeout(function() {
+                    addLog('');
+                    addLog('--- Test 3: hash change ---');
+                    location.hash = '#meeting.tencent.com';
+                    addLog('hash → ' + location.href);
+
+                    setTimeout(function() {
+                        callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 0}, 'test_after_hash');
+
+                        // 最终结果
+                        setTimeout(function() {
+                            addLog('');
+                            addLog('=== Final: waiting for callbacks (5s) ===');
+                            addLog('Current URL: ' + location.href);
+                        }, 2000);
+                    }, 500);
+                }, 1000);
+            }, 500);
+        }, 1000);
+    }, 500);
+}
+
+setTimeout(function() {
+    addLog('Starting test in 2s...');
+    setTimeout(startTest, 2000);
+}, 1000);
+</script>
+</body>
+</html>
