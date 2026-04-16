@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Check JSBridge</title></head>
+<body>
+<h2>JSBridge Interface Check</h2>
+<pre id="log" style="font-size:14px;"></pre>
+<script>
+var log = document.getElementById('log');
+function addLog(s) { log.textContent += s + '\n'; }
+
+addLog('URL: ' + location.href);
+addLog('');
+
+// 检查所有可能的 JSBridge 接口名
+var names = ['JSCallJavaMgr', 'WMJSBridge', 'TmJsCallJava', 'jsbridge',
+             'WebViewJavascriptBridge', 'prompt', '_dsbridge', 'dsBridge',
+             'android', 'native', 'WemeetBridge'];
+
+for (var i = 0; i < names.length; i++) {
+    var name = names[i];
+    try {
+        var obj = window[name];
+        if (obj !== undefined) {
+            addLog('✓ ' + name + ' = ' + typeof obj);
+            // 列出方法
+            var methods = [];
+            for (var k in obj) { methods.push(k); }
+            if (methods.length > 0) {
+                addLog('  methods: ' + methods.join(', '));
+            }
+            // 尝试调用
+            if (typeof obj.JSCallNative === 'function') {
+                addLog('  ★ JSCallNative exists!');
+                try {
+                    obj.JSCallNative('CommonPlugin', '{"module":"CommonPlugin","method":"GetPerformance","event_name":"test1","params":{}}');
+                    addLog('  ★ JSCallNative called OK');
+                } catch(e) {
+                    addLog('  JSCallNative error: ' + e);
+                }
+            }
+        } else {
+            addLog('✗ ' + name + ' = undefined');
+        }
+    } catch(e) {
+        addLog('? ' + name + ' error: ' + e);
+    }
+}
+</script>
+</body>
+</html>
