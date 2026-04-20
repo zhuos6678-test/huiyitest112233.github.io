@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>GetTicket Test</title></head>
+<body>
+<h2>GetTicket Simple Test</h2>
+<pre id="log" style="font-size:12px;"></pre>
+<script>
+var log = document.getElementById('log');
+function addLog(s) { log.textContent += s + '\n'; }
+
+addLog('URL: ' + location.href);
+
+if (!window.JSCallJavaMgr) {
+    addLog('ERROR: JSCallJavaMgr not found!');
+} else {
+    addLog('JSCallJavaMgr OK');
+
+    // 注册 callback
+    window.steal_cb = function(jsonStr) {
+        addLog('');
+        addLog('=== TICKET RECEIVED ===');
+        addLog(jsonStr);
+    };
+
+    // 调用 GetTicket
+    var req = {
+        callback: 'steal_cb',
+        module: 'CommonPlugin',
+        method: 'GetTicket',
+        param: { type: 'W9' },
+        callId: 'test_' + Date.now()
+    };
+
+    addLog('Sending: ' + JSON.stringify(req));
+    JSCallJavaMgr.JSCallNative(JSON.stringify(req));
+    addLog('Sent. Waiting for callback...');
+}
+</script>
+</body>
+</html>
